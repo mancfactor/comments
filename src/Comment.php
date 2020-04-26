@@ -32,6 +32,16 @@ class Comment extends Model
         'approved' => 'boolean'
     ];
 
+    public function getApprovedText() {
+        if($this->attributes['approved'] == 1) {
+            $text = "Approved";
+        } else {
+            $text = "Rejected";
+        }
+
+        return $text;
+    } 
+
     /**
      * The event map for the model.
      *

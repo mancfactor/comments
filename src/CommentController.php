@@ -33,11 +33,15 @@ class CommentController extends Controller implements CommentControllerInterface
         }
 
         // Define guest rules if guest commenting is enabled.
-        if (config('comments.guest_commenting') == true) {
+        if (!auth()->check() && config('comments.guest_commenting') == true) {
             $guest_rules = [
-                'guest_name' => 'required|string|max:255',
-                'guest_email' => 'required|string|email|max:255',
-            ];
+                'guest_name' => 'required|string|max:50',
+	    ];
+		
+	    if(config('comments.guest_email') == true) {
+                $guest_rules[] = ['guest_email' => 'required|string|email|max:255'];
+	    }
+            
         }
 
         // Merge guest rules, if any, with normal validation rules.
@@ -52,10 +56,12 @@ class CommentController extends Controller implements CommentControllerInterface
         $commentClass = config('comments.model');
         $comment = new $commentClass;
 
-        if (config('comments.guest_commenting') == true) {
+        if (!auth()->check() && config('comments.guest_commenting') == true) {
             $comment->guest_name = $request->guest_name;
-            $comment->guest_email = $request->guest_email;
-        } else {
+	    if(config('comments.guest_email') == true) {
+	    	$comment->guest_email = $request->guest_email;
+	    }       
+	} else {
             $comment->commenter()->associate(auth()->user());
         }
 

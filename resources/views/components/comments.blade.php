@@ -10,7 +10,7 @@
     <div class="alert alert-warning">There are no comments yet.</div>
 @endif
 
-<ul class="list-unstyled">
+<ul class="list-unstyled plain">
     @php
         $grouped_comments = $comments->sortBy('created_at')->groupBy('child_id');
     @endphp
@@ -26,12 +26,13 @@
         @endif
     @endforeach
 </ul>
-
+@include('layouts.errors')
 @auth
     @include('comments::_form')
 @elseif(config('comments.guest_commenting') == true)
     @include('comments::_form', [
-        'guest_commenting' => true
+        'guest_commenting' => true,
+        'message' => ''
     ])
 @else
     <div class="card">

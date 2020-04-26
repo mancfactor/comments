@@ -57,6 +57,22 @@ return [
      * Visitors will be asked to provide their name and email
      * address in order to post a comment.
      */
-    'guest_commenting' => false
+    'guest_commenting' => false,
+    
+    /**
+    * Set this option to 'true' to require name and email for guest commnets.
+    *
+    * Visitors will be asked to provide only their name if false.
+    */
+    'guest_email' => false,
+    
+    /**
+    * Set this option to 'true' to use gravatars.
+    *
+    * Users will get their gravatar from 
+    * https://www.gravatar.com/avatar/[md5(email)]
+    */
+    'use_gravatar' => false
+     
 
 ];
