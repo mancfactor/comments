@@ -4,19 +4,23 @@ namespace Laravelista\Comments;
 
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
-use Illuminate\Foundation\Validation\ValidatesRequests;
-use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
+use Illuminate\Support\Facades\Auth;
+use Spatie\Honeypot\ProtectAgainstSpam;
+use Illuminate\Support\Facades\Config;
+use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\Redirect;
+use Illuminate\Support\Facades\URL;
+use Illuminate\Support\Facades\Validator;
 
 class CommentController extends Controller implements CommentControllerInterface
 {
-    use ValidatesRequests, AuthorizesRequests;
-
     public function __construct()
     {
         $this->middleware('web');
 
-        if (config('comments.guest_commenting') == true) {
+        if (Config::get('comments.guest_commenting') == true) {
             $this->middleware('auth')->except('store');
+            $this->middleware(ProtectAgainstSpam::class)->only('store');
         } else {
             $this->middleware('auth');
         }
@@ -28,49 +32,49 @@ class CommentController extends Controller implements CommentControllerInterface
     public function store(Request $request)
     {
         // If guest commenting is turned off, authorize this action.
-        if (config('comments.guest_commenting') == false) {
-            $this->authorize('create-comment', Comment::class);
+        if (Config::get('comments.guest_commenting') == false) {
+            Gate::authorize('create-comment', Comment::class);
         }
 
-        // Define guest rules if guest commenting is enabled.
-        if (!auth()->check() && config('comments.guest_commenting') == true) {
+        // Define guest rules if user is not logged in.
+        if (!Auth::check()) {
             $guest_rules = [
                 'guest_name' => 'required|string|max:50',
 	    ];
 		
-	    if(config('comments.guest_email') == true) {
+	    if(Config::get(''comments.guest_email') == true) {
                 $guest_rules[] = ['guest_email' => 'required|string|email|max:255'];
 	    }
             
         }
 
         // Merge guest rules, if any, with normal validation rules.
-        $this->validate($request, array_merge($guest_rules ?? [], [
+        Validator::make($request->all(), array_merge($guest_rules ?? [], [
             'commentable_type' => 'required|string',
             'commentable_id' => 'required|string|min:1',
             'message' => 'required|string'
-        ]));
+        ]))->validate();
 
         $model = $request->commentable_type::findOrFail($request->commentable_id);
 
-        $commentClass = config('comments.model');
+        $commentClass = Config::get('comments.model');
         $comment = new $commentClass;
 
-        if (!auth()->check() && config('comments.guest_commenting') == true) {
+        if (!Auth::check()) {
             $comment->guest_name = $request->guest_name;
-	    if(config('comments.guest_email') == true) {
+	    if(Config::get('comments.guest_email') == true) {
 	    	$comment->guest_email = $request->guest_email;
 	    }       
 	} else {
-            $comment->commenter()->associate(auth()->user());
+            $comment->commenter()->associate(Auth::user());
         }
 
         $comment->commentable()->associate($model);
         $comment->comment = $request->message;
-        $comment->approved = !config('comments.approval_required');
+        $comment->approved = !Config::get('comments.approval_required');
         $comment->save();
 
-        return redirect()->to(url()->previous() . '#comment-' . $comment->id);
+        return Redirect::to(URL::previous() . '#comment-' . $comment->id);
     }
 
     /**
@@ -78,17 +82,17 @@ class CommentController extends Controller implements CommentControllerInterface
      */
     public function update(Request $request, Comment $comment)
     {
-        $this->authorize('edit-comment', $comment);
+        Gate::authorize('edit-comment', $comment);
 
-        $this->validate($request, [
+        Validator::make($request->all(), [
             'message' => 'required|string'
-        ]);
+        ])->validate();
 
         $comment->update([
             'comment' => $request->message
         ]);
 
-        return redirect()->to(url()->previous() . '#comment-' . $comment->id);
+        return Redirect::to(URL::previous() . '#comment-' . $comment->id);
     }
 
     /**
@@ -96,11 +100,16 @@ class CommentController extends Controller implements CommentControllerInterface
      */
     public function destroy(Comment $comment)
     {
-        $this->authorize('delete-comment', $comment);
+        Gate::authorize('delete-comment', $comment);
 
-        $comment->delete();
+        if (Config::get('comments.soft_deletes') == true) {
+			$comment->delete();
+		}
+		else {
+			$comment->forceDelete();
+		}
 
-        return redirect()->back();
+        return Redirect::back();
     }
 
     /**
@@ -108,21 +117,21 @@ class CommentController extends Controller implements CommentControllerInterface
      */
     public function reply(Request $request, Comment $comment)
     {
-        $this->authorize('reply-to-comment', $comment);
+        Gate::authorize('reply-to-comment', $comment);
 
-        $this->validate($request, [
+        Validator::make($request->all(), [
             'message' => 'required|string'
-        ]);
+        ])->validate();
 
-        $commentClass = config('comments.model');
+        $commentClass = Config::get('comments.model');
         $reply = new $commentClass;
-        $reply->commenter()->associate(auth()->user());
+        $reply->commenter()->associate(Auth::user());
         $reply->commentable()->associate($comment->commentable);
         $reply->parent()->associate($comment);
         $reply->comment = $request->message;
-        $reply->approved = !config('comments.approval_required');
+        $reply->approved = !Config::get('comments.approval_required');
         $reply->save();
 
-        return redirect()->to(url()->previous() . '#comment-' . $reply->id);
+        return Redirect::to(URL::previous() . '#comment-' . $reply->id);
     }
 }
